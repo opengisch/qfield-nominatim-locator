@@ -52,8 +52,8 @@ Item {
         mapCanvas.mapSettings.setExtent(extent, true);
       }
       
-      locatorBridge.locatorHighlightGeometry.qgsGeometry = geometry;
-      locatorBridge.locatorHighlightGeometry.crs = CoordinateReferenceSystemUtils.fromDescription(parameters["service_crs"]);
+      locatorBridge.geometryHighlighter.qgsGeometry = geometry;
+      locatorBridge.geometryHighlighter.crs = CoordinateReferenceSystemUtils.fromDescription(parameters["service_crs"]);
     }
 
     function triggerResultFromAction(result, actionId) {
