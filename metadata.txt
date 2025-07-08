@@ -3,5 +3,5 @@ name=OpenStreetMap Nominatim Search
 description=Integrates OpenStreetMap Nominatim results into the search bar through the osm prefix
 author=OPENGIS.ch
 icon=icon.svg
-version=1.3
+version=1.4
 homepage=https://www.opengis.ch/

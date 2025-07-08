@@ -48,7 +48,7 @@ Item {
       "service_crs": settings.service_crs
     }
     source: Qt.resolvedUrl('nominatim.qml')
-  
+
     Component.onCompleted: {
       if (nominatimLocatorFilter.description !== undefined) {
         nominatimLocatorFilter.description = "Returns OpenStreetMap Nominatim search results."
