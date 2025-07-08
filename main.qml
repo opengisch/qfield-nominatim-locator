@@ -49,6 +49,12 @@ Item {
     }
     source: Qt.resolvedUrl('nominatim.qml')
   
+    Component.onCompleted: {
+      if (nominatimLocatorFilter.description !== undefined) {
+        nominatimLocatorFilter.description = "Returns OpenStreetMap Nominatim search results."
+      }
+    }
+
     function triggerResult(result) {
       let geometry = result.userData.geometry
       if (geometry.type === Qgis.GeometryType.Point) {
