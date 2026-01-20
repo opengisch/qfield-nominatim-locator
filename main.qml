@@ -1,9 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-
 import QtCore
-
 import org.qfield
 import org.qgis
 import Theme
@@ -13,6 +11,18 @@ Item {
 
   property var mainWindow: iface.mainWindow()
   property var mapCanvas: iface.mapCanvas()
+
+  readonly property var presets: [
+    { name: "OpenStreetMap", url: "https://nominatim.openstreetmap.org/search.php", crs: "EPSG:4326" }
+  ]
+
+  function getPresetByName(name) {
+    return presets.find(p => p.name === name);
+  }
+
+  function getActivePreset() {
+    return getPresetByName(settings.service_endpoint) || presets[0];
+  }
 
   Component.onCompleted: {
     nominatimLocatorFilter.locatorBridge.registerQFieldLocatorFilter(nominatimLocatorFilter);
@@ -25,15 +35,17 @@ Item {
   Settings {
     id: settings
     category: "qfield-nominatim-locator"
-    
-    property string service_url: "https://nominatim.openstreetmap.org/search.php"
-    property string service_crs: "EPSG:4326"
+
+    property string service_endpoint: "OpenStreetMap"
+    property string service_url: ""
+    property string service_crs: ""
+    property string service_endpoint_history: "[]"
   }
-  
+
   function configure() {
     settingsDialog.open();
   }
-  
+
   QFieldLocatorFilter {
     id: nominatimLocatorFilter
 
@@ -44,8 +56,8 @@ Item {
     locatorBridge: iface.findItemByObjectName('locatorBridge')
 
     parameters: {
-      "service_url": settings.service_url,
-      "service_crs": settings.service_crs
+      "service_url": settings.service_url || plugin.getActivePreset().url,
+      "service_crs": settings.service_crs || plugin.getActivePreset().crs
     }
     source: Qt.resolvedUrl('nominatim.qml')
 
@@ -72,7 +84,7 @@ Item {
         )
         mapCanvas.mapSettings.setExtent(extent, true);
       }
-      
+
       locatorBridge.geometryHighlighter.qgsGeometry = geometry;
       locatorBridge.geometryHighlighter.crs = CoordinateReferenceSystemUtils.fromDescription(parameters["service_crs"]);
     }
@@ -93,8 +105,7 @@ Item {
       }
     }
   }
-  
-  
+
   Dialog {
     id: settingsDialog
     parent: mainWindow.contentItem
@@ -103,11 +114,75 @@ Item {
     font: Theme.defaultFont
     standardButtons: Dialog.Ok | Dialog.Cancel
     title: qsTr("Nominatim search settings")
-
     x: (mainWindow.width - width) / 2
     y: (mainWindow.height - height) / 2
-
     width: mainWindow.width * 0.8
+
+    property var urlHistory: []
+
+    function loadHistory() {
+      try {
+        urlHistory = JSON.parse(settings.service_endpoint_history);
+        if (!Array.isArray(urlHistory)) urlHistory = [];
+      } catch (e) {
+        urlHistory = [];
+      }
+    }
+
+    function saveToHistory(url, crs) {
+      urlHistory = urlHistory.filter(e => e.url !== url);
+      urlHistory.unshift({ url: url, crs: crs });
+      if (urlHistory.length > 10) urlHistory.length = 10;
+      settings.service_endpoint_history = JSON.stringify(urlHistory);
+    }
+
+    function deleteFromHistory() {
+      const url = customUrlCombo.editText.trim();
+      urlHistory = urlHistory.filter(e => e.url !== url);
+      settings.service_endpoint_history = JSON.stringify(urlHistory);
+      updateCustomUrlCombo();
+    }
+
+    function updateCustomUrlCombo() {
+      customUrlCombo.model = urlHistory.map(e => e.url);
+    }
+
+    function updateUI() {
+      const isCustom = endpointCombo.currentText === qsTr("Custom");
+
+      customUrlRow.visible = isCustom;
+
+      if (isCustom) {
+        updateCustomUrlCombo();
+        const currentUrl = customUrlCombo.editText.trim();
+        const saved = urlHistory.find(e => e.url === currentUrl);
+        serviceCrsTextField.text = saved ? saved.crs : (settings.service_crs || plugin.getActivePreset().crs);
+      } else {
+        const preset = plugin.getPresetByName(endpointCombo.currentText);
+        if (preset) {
+          serviceCrsTextField.text = preset.crs;
+        }
+      }
+    }
+
+    onOpened: {
+      loadHistory();
+
+      let endpointItems = presets.map(p => p.name);
+      endpointItems.push(qsTr("Custom"));
+      endpointCombo.model = endpointItems;
+
+      const isCustom = settings.service_url !== "";
+      if (isCustom) {
+        endpointCombo.currentIndex = endpointCombo.model.length - 1;
+        customUrlCombo.editText = settings.service_url;
+      } else {
+        const idx = endpointCombo.model.indexOf(settings.service_endpoint);
+        endpointCombo.currentIndex = idx !== -1 ? idx : 0;
+      }
+
+      updateUI();
+    }
 
     ColumnLayout {
       width: parent.width
@@ -118,32 +193,92 @@ Item {
         text: qsTr("Service URL")
         font: Theme.defaultFont
       }
-      
-      TextField {
-        id: serviceUrlTextField
+
+      ComboBox {
+        id: endpointCombo
         Layout.fillWidth: true
         font: Theme.defaultFont
-        text: settings.service_url
+        onActivated: settingsDialog.updateUI()
       }
-      
+
+      RowLayout {
+        id: customUrlRow
+        Layout.fillWidth: true
+        spacing: 8
+        visible: false
+
+        ComboBox {
+          id: customUrlCombo
+          Layout.fillWidth: true
+          font: Theme.defaultFont
+          editable: true
+          onEditTextChanged: settingsDialog.updateUI()
+        }
+
+        QfToolButton {
+          id: deleteButton
+          bgcolor: "transparent"
+          iconSource: Theme.getThemeVectorIcon("ic_delete_forever_white_24dp")
+          iconColor: Theme.mainTextColor
+          onClicked: {
+            settingsDialog.deleteFromHistory();
+            mainWindow.displayToast(qsTr("Removed URL"));
+          }
+        }
+      }
+
       Label {
         id: serviceCrsLabel
         text: qsTr("Service CRS")
         font: Theme.defaultFont
       }
-      
+
       TextField {
         id: serviceCrsTextField
         Layout.fillWidth: true
         font: Theme.defaultFont
-        text: settings.service_crs
+        placeholderText: qsTr("e.g., EPSG:4326")
       }
     }
 
     onAccepted: {
-      settings.service_url = serviceUrlTextField.text;
-      settings.service_crs = serviceCrsTextField.text;
-      mainWindow.displayToast(qsTr("Settings stored"));
+      const crs = serviceCrsTextField.text.trim();
+
+      if (!crs) {
+        mainWindow.displayToast(qsTr("CRS is required"));
+        return;
+      }
+
+      const isCustom = endpointCombo.currentText === qsTr("Custom");
+
+      if (isCustom) {
+        const url = customUrlCombo.editText.trim();
+        if (!url) {
+          mainWindow.displayToast(qsTr("URL is required"));
+          return;
+        }
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+          mainWindow.displayToast(qsTr("Invalid URL entered"));
+          return;
+        }
+
+        settings.service_endpoint = "Custom";
+        settings.service_url = url;
+        settings.service_crs = crs;
+        saveToHistory(url, crs);
+        mainWindow.displayToast(qsTr("Settings stored"));
+      } else {
+        const preset = plugin.getPresetByName(endpointCombo.currentText);
+        settings.service_endpoint = endpointCombo.currentText;
+        settings.service_url = "";
+        settings.service_crs = crs;
+
+        if (preset && crs !== preset.crs) {
+          mainWindow.displayToast(qsTr("Preset CRS changed"));
+        } else {
+          mainWindow.displayToast(qsTr("Settings stored"));
+        }
+      }
     }
   }
 }
