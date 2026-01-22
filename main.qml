@@ -113,7 +113,7 @@ Item {
     modal: true
     font: Theme.defaultFont
     standardButtons: Dialog.Ok | Dialog.Cancel
-    title: qsTr("Nominatim search settings")
+    title: qsTr("Nominatim Search Settings")
     x: (mainWindow.width - width) / 2
     y: (mainWindow.height - height) / 2
     width: mainWindow.width * 0.8
@@ -242,6 +242,18 @@ Item {
         Layout.fillWidth: true
         font: Theme.defaultFont
         placeholderText: qsTr("e.g., EPSG:4326")
+      }
+
+      Label {
+        Layout.fillWidth: true
+        Layout.topMargin: 10
+        Layout.bottomMargin: 10
+        font: Theme.defaultFont
+        color: Theme.secondaryTextColor
+        wrapMode: Text.WordWrap
+        text: qsTr("Nominatim is an open source geocoding project with OpenStreetMap data. To know more about it, <a href=\"https://nominatim.org/\">visit its website</a>.")
+
+        onLinkActivated: link => { Qt.openUrlExternally(link); }
       }
     }
 
