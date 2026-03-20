@@ -82,6 +82,7 @@ Item {
     }
     let viewbox = GeometryUtils.reprojectRectangle(context.targetExtent, context.targetExtentCrs, CoordinateReferenceSystemUtils.fromDescription(parameters["service_crs"])).toString().replace(" : ", ",")
     request.open("GET", parameters["service_url"] + "?q=" + encodeURIComponent(string) + '&viewbox=' + viewbox + '&format=geojson&extratags=1&addressdetails=1&limit=20')
+    request.setHeader("User-Agent", "QField")
     request.send();
   }
 }
